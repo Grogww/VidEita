@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "@ngrok/ngrok": "^1.7.0",
+    "dotenv": "^17.4.2"
+  },
+  "optionalDependencies": {
+    "@ngrok/ngrok-linux-x64-gnu": "^1.7.0"
+  }
+}

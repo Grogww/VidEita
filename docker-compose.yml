@@ -1,0 +1,112 @@
+# Os valores após ":-" são PADRÕES DE DEMONSTRAÇÃO (sala de aula / avaliação).
+# Para trocá-los, copie .env.example para .env na raiz e preencha as variáveis.
+# NÃO use estes padrões em um ambiente exposto na internet.
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-mysql}
+      MYSQL_DATABASE: ${DB_NAME:-base_projeto_integrador}
+      MYSQL_USER: ${DB_USER:-admin}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-admin123}
+    ports:
+      - "127.0.0.1:3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  minio:
+    # ATENÇÃO: em 2026-11-05 o pull de minio/minio falhou (Docker Hub e Quay).
+    # MINIO_IMAGE permite trocar a imagem pelo .env sem editar este arquivo.
+    image: ${MINIO_IMAGE:-minio/minio:latest}
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-admin12345}
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - minio_data:/data
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3000
+
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-base_projeto_integrador}
+      DB_USER: ${DB_USER:-admin}
+      DB_PASSWORD: ${DB_PASSWORD:-admin123}
+      DB_CONNECT_RETRIES: 40
+      DB_CONNECT_DELAY_MS: 2000
+
+      # Vazio = o backend gera um segredo aleatório temporário (sessões caem ao reiniciar).
+      JWT_SECRET: ${JWT_SECRET:-}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+
+      # Administrador criado/atualizado a cada inicialização do backend.
+      ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@prefeitura.gov.br}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@prefeitura.gov.br}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-123456}
+      SEED_ADMIN_NAME: ${SEED_ADMIN_NAME:-Administrador}
+
+      UPLOAD_DIR: /app/uploads
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+
+      STORAGE_DRIVER: minio
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: "false"
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-admin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-admin12345}
+      MINIO_BUCKET: ocorrencias
+
+      # Login com Google (opcional). Usa o mesmo Client ID do frontend.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-${VITE_GOOGLE_CLIENT_ID:-}}
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+      minio:
+        condition: service_started
+
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/nginx/Dockerfile
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+  adminer:
+    image: adminer:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8081:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
+  minio_data:

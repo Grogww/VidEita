@@ -1,0 +1,36 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Docker: subir tudo",
+      "type": "shell",
+      "command": "docker compose up --build -d",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker: ver status",
+      "type": "shell",
+      "command": "docker compose ps",
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker: logs backend",
+      "type": "shell",
+      "command": "docker compose logs -f backend",
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker: parar tudo",
+      "type": "shell",
+      "command": "docker compose down",
+      "problemMatcher": []
+    },
+    {
+      "label": "Docker: resetar banco",
+      "type": "shell",
+      "command": "docker compose down -v && docker compose up --build -d",
+      "problemMatcher": []
+    }
+  ]
+}
