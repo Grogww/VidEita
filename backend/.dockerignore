@@ -1,0 +1,14 @@
+node_modules
+.env
+npm-debug.log
+
+docker compose exec mysql mysql -uadmin -padmin123 base_projeto_integrador
+
+SET FOREIGN_KEY_CHECKS = 0;
+
+TRUNCATE TABLE report_attachments;
+TRUNCATE TABLE report_status_history;
+TRUNCATE TABLE report_encaminhamentos;
+TRUNCATE TABLE reports;
+
+SET FOREIGN_KEY_CHECKS = 1;
