@@ -30,6 +30,15 @@ const errorMiddleware = (err, req, res, next) => {
     });
   }
 
+  // Erros de upload do multer
+  if (err.name === 'MulterError') {
+    const muitoGrande = err.code === 'LIMIT_FILE_SIZE';
+    return res.status(muitoGrande ? 413 : 400).json({
+      status: 'erro',
+      mensagem: muitoGrande ? 'Imagem muito grande (máx 15MB)' : 'Falha no envio do arquivo',
+    });
+  }
+
   // Erro genérico
   const statusCode = err.statusCode || 500;
   const mensagem =

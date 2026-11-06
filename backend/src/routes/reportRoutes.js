@@ -7,7 +7,10 @@ const {
   updateStatus,
   deleteReport,
 } = require('../controllers/ReportController');
+const { analisarImagem } = require('../controllers/AnalysisController');
 const { authMiddleware, adminMiddleware } = require('../middlewares/authMiddleware');
+const { aiRateLimit } = require('../middlewares/aiRateLimitMiddleware');
+const { validarImagem } = require('../middlewares/imageValidationMiddleware');
 const { upload } = require('../services/uploadService');
 
 /**
@@ -132,10 +135,55 @@ router.get('/nearby', authMiddleware, getReportsByLocation);
 
 /**
  * @swagger
+ * /reports/analise:
+ *   post:
+ *     summary: Analisar a imagem de uma ocorrência com IA
+ *     description: Verifica se a imagem mostra um problema de infraestrutura urbana e sugere o preenchimento. A imagem não é armazenada. Limite de 10 análises por minuto por usuário.
+ *     tags: [Ocorrências]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [imagem]
+ *             properties:
+ *               imagem:
+ *                 type: string
+ *                 format: binary
+ *                 description: Imagem JPEG, PNG, WebP, HEIC ou HEIF de até 15 MB.
+ *     responses:
+ *       200:
+ *         description: Análise concluída. O bloqueio da imagem é informado no campo resultado.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ImageAnalysisResponse'
+ *       400:
+ *         description: Imagem ausente.
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       413:
+ *         description: Imagem maior que 15 MB.
+ *       415:
+ *         description: Arquivo não é uma imagem permitida.
+ *       422:
+ *         description: Imagem corrompida ou ilegível.
+ *       429:
+ *         description: Limite de análises excedido.
+ *       500:
+ *         $ref: '#/components/responses/InternalError'
+ */
+router.post('/analise', authMiddleware, aiRateLimit, upload.single('imagem'), validarImagem, analisarImagem);
+
+/**
+ * @swagger
  * /reports:
  *   post:
  *     summary: Criar nova ocorrência
- *     description: Cria uma ocorrência e, opcionalmente, envia uma imagem para o MinIO. Aceita JPG, PNG, WebP, GIF e HEIC/HEIF quando o backend estiver com conversão habilitada.
+ *     description: Cria uma ocorrência e, opcionalmente, envia uma imagem para o MinIO. Aceita JPEG, PNG, WebP e HEIC/HEIF. Com imagem, exige o analise_id retornado por POST /reports/analise.
  *     tags: [Ocorrências]
  *     security:
  *       - bearerAuth: []
@@ -180,6 +228,18 @@ router.get('/nearby', authMiddleware, getReportsByLocation);
  *               anonimo:
  *                 type: boolean
  *                 example: false
+ *               prioridade:
+ *                 type: string
+ *                 enum: [baixa, media, alta, urgente]
+ *                 example: media
+ *               orgao:
+ *                 type: string
+ *                 enum: [PREFEITURA, CELESC, VISAN]
+ *                 example: PREFEITURA
+ *               analise_id:
+ *                 type: string
+ *                 format: uuid
+ *                 description: Obrigatório quando houver imagem.
  *               imagem:
  *                 type: string
  *                 format: binary
@@ -195,10 +255,16 @@ router.get('/nearby', authMiddleware, getReportsByLocation);
  *         description: Dados inválidos ou campos obrigatórios ausentes.
  *       401:
  *         $ref: '#/components/responses/Unauthorized'
+ *       413:
+ *         description: Imagem maior que 15 MB.
+ *       415:
+ *         description: Arquivo não é uma imagem permitida.
+ *       422:
+ *         description: Imagem sem análise válida ou bloqueada.
  *       500:
  *         $ref: '#/components/responses/InternalError'
  */
-router.post('/', authMiddleware, upload.single('imagem'), createReport);
+router.post('/', authMiddleware, upload.single('imagem'), validarImagem, createReport);
 
 /**
  * @swagger

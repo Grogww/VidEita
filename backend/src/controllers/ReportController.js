@@ -1,6 +1,10 @@
 const Report = require('../models/Report');
+const Orgao = require('../models/Orgao');
+const AiAnalysisLog = require('../models/AiAnalysisLog');
 const { uploadParaCloudinary, removerDoCloudinary } = require('../services/uploadService');
 const { filtrarPorProximidade } = require('../services/mapService');
+const { PRIORIDADES, ORGAOS } = require('../services/ai/analysisPrompt');
+const { imageAnalysisService } = require('./AnalysisController');
 const { createError } = require('../middlewares/errorMiddleware');
 
 const toPlain = (r) => r && r.toJSON ? r.toJSON() : r;
@@ -8,16 +12,29 @@ const toPlain = (r) => r && r.toJSON ? r.toJSON() : r;
 // POST /reports
 const createReport = async (req, res, next) => {
   try {
-    const { titulo, descricao, categoria, latitude, longitude, anonimo } = req.body;
+    const { titulo, descricao, categoria, latitude, longitude, anonimo, prioridade, orgao, analise_id } = req.body;
     if (!titulo || !categoria || latitude === undefined || longitude === undefined) {
       throw createError('Título, categoria, latitude e longitude são obrigatórios', 400);
     }
 
+    if (prioridade && !PRIORIDADES.includes(prioridade)) {
+      throw createError(`Prioridade inválida. Aceitas: ${PRIORIDADES.join(', ')}`, 400);
+    }
+
+    if (orgao && !Object.hasOwn(ORGAOS, orgao)) {
+      throw createError(`Órgão inválido. Aceitos: ${Object.keys(ORGAOS).join(', ')}`, 400);
+    }
+
+    const orgaoResponsavel = orgao ? await Orgao.findBySigla(ORGAOS[orgao]) : null;
+
     let imagem_url = null;
     let imagem_public_id = null;
     let mime_type = null;
+    let analise = null;
 
     if (req.file) {
+      analise = await imageAnalysisService.validarParaEnvio(analise_id, req.file, req.user.id);
+
       const uploaded = await uploadParaCloudinary(req.file);
       imagem_url = uploaded.url;
       imagem_public_id = uploaded.public_id;
@@ -36,7 +53,11 @@ const createReport = async (req, res, next) => {
       status: 'pendente',
       user_id: req.user.id,
       anonimo: anonimo === 'true' || anonimo === true,
+      prioridade,
+      orgao_id: orgaoResponsavel?.id,
     });
+
+    if (analise) await AiAnalysisLog.vincularReport(analise.id, report.id);
 
     const full = await Report.findByPk(report.id, { include: true });
     return res.status(201).json({

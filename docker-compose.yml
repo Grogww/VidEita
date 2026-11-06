@@ -11,7 +11,7 @@ services:
       MYSQL_USER: ${DB_USER:-admin}
       MYSQL_PASSWORD: ${DB_PASSWORD:-admin123}
     ports:
-      - "127.0.0.1:3307:3306"
+      - "127.0.0.1:3308:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./database/init:/docker-entrypoint-initdb.d:ro
@@ -76,6 +76,11 @@ services:
 
       # Login com Google (opcional). Usa o mesmo Client ID do frontend.
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-${VITE_GOOGLE_CLIENT_ID:-}}
+
+      # Análise de imagens com Gemini. Sem chave, a ocorrência segue sem sugestões.
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.6-flash}
+      GEMINI_TIMEOUT_MS: ${GEMINI_TIMEOUT_MS:-40000}
     ports:
       - "127.0.0.1:3000:3000"
     volumes:

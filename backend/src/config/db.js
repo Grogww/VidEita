@@ -79,6 +79,53 @@ const ensureGoogleAuthColumns = async () => {
   }
 };
 
+// Os scripts de database/init só rodam com o volume vazio. Isto cobre bancos já criados.
+const ensureAiSchema = async () => {
+  try {
+    await execute(`
+      CREATE TABLE IF NOT EXISTS ai_analysis_logs (
+        id CHAR(36) NOT NULL,
+        user_id CHAR(36) NULL,
+        report_id CHAR(36) NULL,
+        imagem_sha256 CHAR(64) NOT NULL,
+        modelo VARCHAR(60) NULL,
+        resultado ENUM('aprovada','bloqueada_impropria','bloqueada_fora_escopo','indisponivel') NOT NULL,
+        motivo VARCHAR(500) NULL,
+        resposta_json JSON NULL,
+        tempo_ms INT UNSIGNED NULL,
+        erro VARCHAR(500) NULL,
+        consumido_em DATETIME(3) NULL,
+        criado_em DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        PRIMARY KEY (id),
+        KEY idx_ai_analysis_logs_user_created (user_id, criado_em),
+        KEY idx_ai_analysis_logs_report (report_id),
+        KEY idx_ai_analysis_logs_resultado (resultado, criado_em),
+        CONSTRAINT fk_ai_analysis_logs_user
+          FOREIGN KEY (user_id) REFERENCES users(id)
+          ON DELETE SET NULL ON UPDATE CASCADE,
+        CONSTRAINT fk_ai_analysis_logs_report
+          FOREIGN KEY (report_id) REFERENCES reports(id)
+          ON DELETE SET NULL ON UPDATE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    const orgaos = [
+      ['Centrais Elétricas de Santa Catarina', 'CELESC', 'Rede elétrica e postes.'],
+      ['VISAN', 'VISAN', 'Abastecimento de água e esgoto.'],
+    ];
+
+    for (const [nome, sigla, endereco] of orgaos) {
+      const existente = await query('SELECT id FROM orgaos_publicos WHERE sigla = ? LIMIT 1', [sigla]);
+      if (!existente.length) {
+        await execute('INSERT INTO orgaos_publicos (nome, sigla, endereco) VALUES (?, ?, ?)', [nome, sigla, endereco]);
+        console.log(`🏛️ Órgão ${sigla} criado`);
+      }
+    }
+  } catch (err) {
+    console.log(`⚠️ Não foi possível ajustar o schema do módulo de IA: ${err.message}`);
+  }
+};
+
 const ensureSeedAdmin = async () => {
   const email = process.env.SEED_ADMIN_EMAIL;
   const password = process.env.SEED_ADMIN_PASSWORD;
@@ -118,6 +165,7 @@ const connectDatabase = async () => {
       connection.release();
       console.log(`✅ MySQL conectado em ${config.host}:${config.port}/${config.database}`);
       await ensureGoogleAuthColumns();
+      await ensureAiSchema();
       await ensureSeedAdmin();
       return;
     } catch (err) {

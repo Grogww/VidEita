@@ -104,7 +104,7 @@ const options = {
               enum: ['pendente', 'em_analise', 'em_andamento', 'resolvido', 'rejeitado'],
               example: 'pendente',
             },
-            prioridade: { type: 'string', nullable: true, example: 'normal' },
+            prioridade: { type: 'string', enum: ['baixa', 'media', 'alta', 'urgente'], example: 'media' },
             user_id: { type: 'string', format: 'uuid', example: '7d79e8df-2a6e-4c05-855f-cb91eeb7e35f' },
             anonimo: { type: 'boolean', example: false },
             criado_em: { type: 'string', format: 'date-time', example: '2026-06-21T20:00:00.000Z' },
@@ -157,6 +157,40 @@ const options = {
               type: 'object',
               properties: {
                 report: { $ref: '#/components/schemas/Report' },
+              },
+            },
+          },
+        },
+        ImageAnalysisResponse: {
+          type: 'object',
+          properties: {
+            status: { type: 'string', example: 'sucesso' },
+            data: {
+              type: 'object',
+              properties: {
+                resultado: {
+                  type: 'string',
+                  enum: ['aprovada', 'bloqueada_impropria', 'bloqueada_fora_escopo', 'indisponivel'],
+                  example: 'aprovada',
+                },
+                analise_id: {
+                  type: 'string',
+                  format: 'uuid',
+                  nullable: true,
+                  description: 'Enviar em POST /reports. Nulo quando a imagem é bloqueada.',
+                },
+                motivo: { type: 'string', example: 'Imagem analisada. Revise as sugestões antes de enviar.' },
+                sugestoes: {
+                  type: 'object',
+                  nullable: true,
+                  properties: {
+                    categoria: { type: 'string', example: 'buraco' },
+                    titulo: { type: 'string', example: 'Buraco na pista' },
+                    descricao: { type: 'string', example: 'Buraco no asfalto ocupando parte da faixa.' },
+                    prioridade: { type: 'string', enum: ['baixa', 'media', 'alta', 'urgente'], example: 'alta' },
+                    orgao: { type: 'string', enum: ['PREFEITURA', 'CELESC', 'VISAN'], example: 'PREFEITURA' },
+                  },
+                },
               },
             },
           },

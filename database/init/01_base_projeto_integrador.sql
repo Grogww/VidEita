@@ -252,6 +252,33 @@ CREATE TABLE report_encaminhamentos (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
+-- Auditoria do módulo de IA. A imagem nunca é guardada, somente o hash.
+CREATE TABLE ai_analysis_logs (
+  id CHAR(36) NOT NULL,
+  user_id CHAR(36) NULL,
+  report_id CHAR(36) NULL,
+  imagem_sha256 CHAR(64) NOT NULL,
+  modelo VARCHAR(60) NULL,
+  resultado ENUM('aprovada','bloqueada_impropria','bloqueada_fora_escopo','indisponivel') NOT NULL,
+  motivo VARCHAR(500) NULL,
+  resposta_json JSON NULL,
+  tempo_ms INT UNSIGNED NULL,
+  erro VARCHAR(500) NULL,
+  consumido_em DATETIME(3) NULL,
+  criado_em DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  KEY idx_ai_analysis_logs_user_created (user_id, criado_em),
+  KEY idx_ai_analysis_logs_report (report_id),
+  KEY idx_ai_analysis_logs_resultado (resultado, criado_em),
+  CONSTRAINT fk_ai_analysis_logs_user
+    FOREIGN KEY (user_id) REFERENCES users(id)
+    ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT fk_ai_analysis_logs_report
+    FOREIGN KEY (report_id) REFERENCES reports(id)
+    ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
 CREATE OR REPLACE VIEW vw_reports_api AS
 SELECT
   r.id,
@@ -311,7 +338,9 @@ INSERT INTO orgaos_publicos (nome, sigla, email_contato, telefone_contato, ender
   ('Departamento de Limpeza Urbana', 'DLU', 'limpeza@videira.sc.gov.br', '(49) 3533-2103', 'Coleta especial, entulho e limpeza pública.'),
   ('Serviço Municipal de Água e Saneamento', 'SMAS', 'saneamento@videira.sc.gov.br', '(49) 3533-2104', 'Vazamentos, esgoto e saneamento.'),
   ('Departamento de Trânsito', 'DTRANS', 'transito@videira.sc.gov.br', '(49) 3533-2106', 'Sinalização e mobilidade urbana.'),
-  ('Ouvidoria Municipal', 'OUV', 'ouvidoria@videira.sc.gov.br', '(49) 3533-2100', 'Triagem e atendimento inicial das ocorrências.');
+  ('Ouvidoria Municipal', 'OUV', 'ouvidoria@videira.sc.gov.br', '(49) 3533-2100', 'Triagem e atendimento inicial das ocorrências.'),
+  ('Centrais Elétricas de Santa Catarina', 'CELESC', NULL, NULL, 'Rede elétrica e postes.'),
+  ('VISAN', 'VISAN', NULL, NULL, 'Abastecimento de água e esgoto.');
 
 -- Usuários e ocorrências NÃO são semeados aqui.
 -- O administrador é criado pelo backend (SEED_ADMIN_* em docker-compose.yml / .env).
