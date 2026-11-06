@@ -20,8 +20,8 @@ const minioClient = new Minio.Client({
   endPoint: process.env.MINIO_ENDPOINT || 'minio',
   port: Number(process.env.MINIO_PORT || 9000),
   useSSL: String(process.env.MINIO_USE_SSL || 'false') === 'true',
-  accessKey: process.env.MINIO_ACCESS_KEY || '',
-  secretKey: process.env.MINIO_SECRET_KEY || '',
+  accessKey: process.env.MINIO_ACCESS_KEY || 'admin',
+  secretKey: process.env.MINIO_SECRET_KEY || 'admin12345',
 });
 
 let bucketReady = false;

@@ -13,7 +13,7 @@ import ReportPopup from '../components/reports/ReportPopup'
 const VIDEIRA_CENTER = [-27.0089, -51.1505]
 const VIDEIRA_BOUNDS = [[-27.075, -51.235], [-26.945, -51.035]]
 const VIDEIRA_MIN_ZOOM = 13
-const VIDEIRA_MAX_ZOOM = 18
+const VIDEIRA_MAX_ZOOM = 22
 
 const STATUS_CFG = {
   pendente: { label: 'Pendente', color: '#F59E0B', bg: '#FEF3C7' },
@@ -21,6 +21,7 @@ const STATUS_CFG = {
   em_andamento: { label: 'Em andamento', color: '#8B5CF6', bg: '#EDE9FE' },
   resolvido: { label: 'Resolvido', color: '#22C55E', bg: '#DCFCE7' },
   rejeitado: { label: 'Rejeitado', color: '#EF4444', bg: '#FEE2E2' },
+
 }
 
 const CATS = ['todas', 'buraco', 'lixo', 'iluminacao', 'calcada', 'sinalizacao', 'esgoto', 'outro']

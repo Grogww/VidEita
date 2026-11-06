@@ -1,0 +1,47 @@
+[
+  {
+    "id": "642a8796-6e3a-4db1-a4ff-4004cbfe55a2",
+    "nome": "Teste",
+    "email": "a@b.com",
+    "senha": "teste-da-senha",
+    "role": "user",
+    "criado_em": "2026-04-22T23:29:48.817Z",
+    "atualizado_em": "2026-04-22T23:29:48.817Z"
+  },
+  {
+    "id": "61dbeef7-9810-4c76-a84c-240ee089bb15",
+    "nome": "Gilberto",
+    "email": "gilberto@gmail.com",
+    "senha": "$2a$12$FZQbKexdqnwWP/DbCTT6Qu8FQHao9szXB2cXbWTMPMbvIsFRgppzG",
+    "role": "admin",
+    "criado_em": "2026-04-24T12:20:10.995Z",
+    "atualizado_em": "2026-04-24T12:20:10.995Z"
+  },
+  {
+    "id": "2dfd7436-8b9e-4163-b491-a6b2f05a024c",
+    "nome": "Matheus de Paula",
+    "email": "Matheus@gmail.com",
+    "senha": "$2a$12$d8.pxSKykWluZ8nRGhQYdOCDRdI/Hfw7wYtUjP5TjY1mu7aPN2Jy6",
+    "role": "user",
+    "criado_em": "2026-04-24T12:23:50.446Z",
+    "atualizado_em": "2026-04-24T12:23:50.446Z"
+  },
+  {
+    "id": "d779e8df-2a6e-4c05-855f-cb91eeb7e35f",
+    "nome": "teste-senha-1234567",
+    "email": "admin@prefeitura.gov.br",
+    "senha": "$2a$12$yS/yhwtMnr1fldrvqqAe3uJ4LD9Ffgchvuha47kBSuyXYCgo3y3EO",
+    "role": "admin",
+    "criado_em": "2026-05-21T11:28:08.337Z",
+    "atualizado_em": "2026-05-21T11:28:08.337Z"
+  },
+  {
+    "id": "9325231b-7b19-48de-afff-4e96fce45e93",
+    "nome": "zack-bocó",
+    "email": "zack@gmail.com",
+    "senha": "$2a$12$yV/nTHyhmuyK4ZCv9pp8DOMNwnbFAeP9poA6evvaTRWQaBYF0QusS",
+    "role": "user",
+    "criado_em": "2026-05-21T11:32:28.256Z",
+    "atualizado_em": "2026-05-21T11:32:28.256Z"
+  }
+]
