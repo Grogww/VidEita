@@ -187,6 +187,11 @@ O botão do Google só aparece quando `VITE_GOOGLE_CLIENT_ID` está definido.
    ```bash
    docker compose up --build -d
    ```
+5. Comando para pegar o link gerado pelo Tunnel do Cloudfire:
+
+   ```bash
+   docker compose logs cloudflared | grep trycloudflare.com
+   ```
 
 O Client ID **não é um segredo** (ele aparece no código do navegador), mas ele identifica o
 seu projeto no Google Cloud. Nunca coloque aqui o *client secret* (`GOCSPX-...`): este fluxo
