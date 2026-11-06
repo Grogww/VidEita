@@ -97,8 +97,8 @@ const Report = {
 
     await db.execute(
       `INSERT INTO reports
-       (id, titulo, descricao, categoria, latitude, longitude, imagem_url, imagem_public_id, status, user_id, anonimo)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, titulo, descricao, categoria, latitude, longitude, imagem_url, imagem_public_id, status, user_id, anonimo, prioridade)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         data.titulo,
@@ -111,6 +111,7 @@ const Report = {
         status,
         data.user_id,
         anonimo,
+        data.prioridade || 'media',
       ]
     );
 
@@ -119,6 +120,13 @@ const Report = {
         `INSERT INTO report_attachments (report_id, nome_arquivo, url, public_id, mime_type, descricao)
          VALUES (?, ?, ?, ?, ?, ?)`,
         [id, data.imagem_public_id, data.imagem_url, data.imagem_public_id, data.mime_type || null, 'Imagem principal']
+      );
+    }
+
+    if (data.orgao_id) {
+      await db.execute(
+        'INSERT INTO report_encaminhamentos (report_id, orgao_id, motivo) VALUES (?, ?, ?)',
+        [id, data.orgao_id, 'Órgão indicado no registro da ocorrência.']
       );
     }
 

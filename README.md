@@ -21,10 +21,11 @@ iluminação etc.) em um mapa e acompanharem o atendimento pela prefeitura.
 4. [Endereços e portas](#endereços-e-portas)
 5. [Comandos úteis](#comandos-úteis)
 6. [Armazenamento de imagens](#armazenamento-de-imagens)
-7. [Login com Google (opcional)](#login-com-google-opcional)
-8. [Acesso pelo celular com ngrok (opcional)](#acesso-pelo-celular-com-ngrok-opcional)
-9. [Desenvolvimento fora do Docker](#desenvolvimento-fora-do-docker)
-10. [Segurança](#segurança)
+7. [Análise de imagens com IA](#análise-de-imagens-com-ia)
+8. [Login com Google (opcional)](#login-com-google-opcional)
+9. [Acesso pelo celular com ngrok (opcional)](#acesso-pelo-celular-com-ngrok-opcional)
+10. [Desenvolvimento fora do Docker](#desenvolvimento-fora-do-docker)
+11. [Segurança](#segurança)
 
 ---
 
@@ -53,8 +54,8 @@ Devem aparecer `mysql`, `minio`, `backend`, `nginx` e `adminer` como `Up`. Depoi
 
 ## Credenciais de demonstração
 
-Valem **somente quando não existe um `.env` na raiz** (são os valores padrão do
-`docker-compose.yml`). Se você definir qualquer variável no `.env`, ela substitui o padrão.
+São os valores padrão do `docker-compose.yml`. Cada um vale enquanto a variável correspondente
+não estiver definida no `.env` da raiz.
 
 | Serviço | Onde acessar | Usuário | Senha (demo) |
 |---|---|---|---|
@@ -85,11 +86,15 @@ docker compose up --build -d
 | `DB_NAME`, `DB_USER`, `DB_PASSWORD` | Banco de dados da aplicação | valores de demonstração |
 | `MYSQL_ROOT_PASSWORD` | Senha do root do MySQL | valor de demonstração |
 | `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` | Credenciais do MinIO | valores de demonstração |
+| `MINIO_IMAGE` | Imagem Docker do armazenamento | `pgsty/silo:RELEASE.2026-10-26T00-00-00Z` |
 | `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_NAME` | Administrador do sistema | valores de demonstração |
 | `JWT_SECRET` | Assinatura dos tokens de login | **vazio**: o backend gera um segredo aleatório a cada início (as sessões caem ao reiniciar) |
 | `JWT_EXPIRES_IN` | Validade do token | `7d` |
 | `CORS_ORIGIN` | Origens permitidas na API | `*` |
 | `VITE_GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_ID` | Login com Google | vazio (botão oculto) |
+| `GEMINI_API_KEY` | Chave da análise de imagens | vazio (ocorrências seguem sem análise) |
+| `GEMINI_MODEL` | Modelo usado na análise | `gemini-3.6-flash` |
+| `GEMINI_TIMEOUT_MS` | Tempo máximo de espera pela IA, somando as novas tentativas | `40000` |
 
 Para gerar um `JWT_SECRET` forte:
 
@@ -152,12 +157,64 @@ SELECT * FROM report_attachments ORDER BY criado_em DESC;
 
 ## Armazenamento de imagens
 
-O sistema aceita imagens JPEG, PNG, WebP, GIF, HEIC e HEIF de até 15 MB. Arquivos HEIC/HEIF
-enviados por celular são convertidos para JPG antes de serem salvos no MinIO.
+O sistema aceita imagens JPEG, PNG, WebP, HEIC e HEIF de até 15 MB, conferindo o conteúdo real
+do arquivo. Arquivos HEIC/HEIF enviados por celular são convertidos para JPG antes de serem
+salvos no MinIO.
 
 O banco guarda apenas o caminho da imagem (por exemplo, `/files/report-123456789.png`), e o
 navegador a acessa pelo Nginx em `http://localhost:8080/files/<nome-do-arquivo>`. O
 navegador nunca fala direto com o MinIO.
+
+O serviço `minio` usa a imagem do [Silo](https://github.com/pgsty/silo), fork do MinIO mantido
+pela comunidade, porque a imagem oficial `minio/minio` foi descontinuada. O protocolo, as
+variáveis `MINIO_*` e o SDK continuam os mesmos, então o restante deste guia segue chamando o
+serviço de MinIO.
+
+---
+
+## Análise de imagens com IA
+
+Ao anexar uma foto na Nova Ocorrência, o backend a analisa com o Gemini antes de armazená-la.
+
+| Resultado | O que acontece |
+|---|---|
+| `aprovada` | Sugere categoria, título, descrição, prioridade e órgão. O usuário pode editar ou ignorar. |
+| `bloqueada_impropria` / `bloqueada_fora_escopo` | A imagem não é armazenada e não pode ser enviada. O usuário pode trocá-la ou seguir sem foto. |
+| `indisponivel` | Sem chave, com timeout ou cota esgotada. A ocorrência segue sem sugestões. |
+
+Para ativar, crie uma chave no [Google AI Studio](https://aistudio.google.com) e adicione ao
+`.env` da raiz:
+
+```env
+GEMINI_API_KEY=SUA_CHAVE
+```
+
+Depois recrie o backend com `docker compose up --build -d`.
+
+Como funciona:
+
+1. `POST /reports/analise` valida o arquivo, reduz a imagem, remove EXIF e GPS e consulta o
+   Gemini. O limite é de 10 análises por minuto por usuário.
+2. `POST /reports` só aceita uma foto com o `analise_id` da análise. O servidor confere o
+   usuário e o hash da imagem. Cada análise vale por 30 minutos e pode ser usada uma vez.
+
+Cada análise fica registrada na tabela `ai_analysis_logs`, com usuário, hash da imagem, modelo,
+resultado, resposta da IA e tempo. A imagem em si não é guardada. Para consultar:
+
+```sql
+SELECT resultado, motivo, modelo, tempo_ms, erro, report_id, criado_em
+FROM ai_analysis_logs ORDER BY criado_em DESC;
+```
+
+No plano gratuito da Gemini API, o Google pode usar o conteúdo enviado para melhorar seus
+produtos. Para fotos reais de cidadãos, use uma chave de projeto com faturamento ativo.
+
+Testes automatizados do backend (não precisam de banco nem de chave):
+
+```bash
+cd backend
+npm test
+```
 
 ---
 
@@ -265,6 +322,7 @@ Notas:
   Antes de expor o sistema (ngrok, servidor, nuvem), defina valores próprios no `.env`.
 - **Arquivos que nunca devem ir para o git:** `.env`, `.env.*` (exceto os `*.example`),
   `.env.ngrok`, chaves e certificados. Todos já estão no `.gitignore`.
+- **`GEMINI_API_KEY`:** fica somente no backend e nunca deve ir para o frontend.
 - **`JWT_SECRET`:** em qualquer ambiente que não seja uma demonstração rápida, defina um valor
   longo e aleatório.
 - **Portas internas:** MySQL, MinIO, Adminer e API só escutam em `127.0.0.1`. Mantenha assim.

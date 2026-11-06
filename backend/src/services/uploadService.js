@@ -4,6 +4,9 @@
  * STORAGE_DRIVER=local  -> salva em /app/uploads e serve por /uploads
  * STORAGE_DRIVER=minio  -> salva no MinIO e serve por /files/:publicId
  *
+ * O multer mantém o arquivo em memória nos dois casos: nada é gravado até a
+ * imagem passar pela validação e pela análise.
+ *
  * Também aceita fotos HEIC/HEIF de celular e converte para JPG antes de salvar.
  */
 const multer = require('multer');
@@ -11,6 +14,7 @@ const path = require('path');
 const fs = require('fs');
 const Minio = require('minio');
 const heicConvert = require('heic-convert');
+const { createError } = require('../middlewares/errorMiddleware');
 
 const storageDriver = (process.env.STORAGE_DRIVER || 'local').toLowerCase();
 const uploadDir = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
@@ -48,13 +52,10 @@ const gerarNomeArquivo = (originalname = '', forcedExt = null) => {
   return `report-${unique}${ext}`;
 };
 
+// O middleware validarImagem substitui o mimetype pelo tipo real do arquivo.
 const isHeicHeif = (file) => {
   const mime = String(file?.mimetype || '').toLowerCase();
-  const name = String(file?.originalname || '').toLowerCase();
-  return mime === 'image/heic' ||
-    mime === 'image/heif' ||
-    name.endsWith('.heic') ||
-    name.endsWith('.heif');
+  return mime === 'image/heic' || mime === 'image/heif';
 };
 
 const normalizarImagem = async (file) => {
@@ -85,52 +86,36 @@ const normalizarImagem = async (file) => {
   };
 };
 
-const localStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const forceJpg = isHeicHeif(file) ? '.jpg' : null;
-    cb(null, gerarNomeArquivo(file.originalname, forceJpg));
-  },
-});
-
-const storage = storageDriver === 'minio'
-  ? multer.memoryStorage()
-  : localStorage;
+const MIMES_PERMITIDOS = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+// Alguns navegadores não informam o tipo de arquivos HEIC.
+const MIMES_GENERICOS = ['', 'application/octet-stream'];
 
 const fileFilter = (req, file, cb) => {
   const mime = String(file.mimetype || '').toLowerCase();
   const name = String(file.originalname || '').toLowerCase();
 
-  const ok = [
-    'image/jpeg',
-    'image/jpg',
-    'image/png',
-    'image/webp',
-    'image/gif',
-    'image/heic',
-    'image/heif',
-  ].includes(mime) || /\.(jpg|jpeg|png|webp|gif|heic|heif)$/i.test(name);
+  const mimeOk = MIMES_PERMITIDOS.includes(mime) || MIMES_GENERICOS.includes(mime);
+  const extensaoOk = /\.(jpg|jpeg|png|webp|heic|heif)$/i.test(name);
 
-  ok ? cb(null, true) : cb(new Error('Apenas imagens são permitidas'), false);
+  mimeOk && extensaoOk
+    ? cb(null, true)
+    : cb(createError('Formato não permitido. Envie JPEG, PNG, WebP, HEIC ou HEIF', 415), false);
 };
 
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   fileFilter,
   limits: { fileSize: 15 * 1024 * 1024 },
 });
 
-const uploadParaCloudinary = async (fileOrPath) => {
-  if (!fileOrPath) return { url: null, public_id: null, mime_type: null };
+const uploadParaCloudinary = async (file) => {
+  if (!file) return { url: null, public_id: null, mime_type: null };
+
+  const normalized = await normalizarImagem(file);
+  const filename = gerarNomeArquivo(normalized.originalname, normalized.ext);
 
   if (storageDriver === 'minio') {
     await garantirBucket();
-
-    const normalized = await normalizarImagem(fileOrPath);
-    const filename = gerarNomeArquivo(normalized.originalname, normalized.ext);
 
     await minioClient.putObject(
       minioBucket,
@@ -147,13 +132,13 @@ const uploadParaCloudinary = async (fileOrPath) => {
     };
   }
 
-  const filePath = typeof fileOrPath === 'string' ? fileOrPath : fileOrPath.path;
-  const filename = path.basename(filePath);
+  await fs.promises.mkdir(uploadDir, { recursive: true });
+  await fs.promises.writeFile(path.join(uploadDir, filename), normalized.buffer);
 
   return {
     url: `/uploads/${filename}`,
     public_id: filename,
-    mime_type: fileOrPath.mimetype || null,
+    mime_type: normalized.mimetype,
   };
 };
 
@@ -201,6 +186,7 @@ const servirArquivo = async (req, res, next) => {
 
 module.exports = {
   upload,
+  normalizarImagem,
   uploadParaCloudinary,
   removerDoCloudinary,
   servirArquivo,

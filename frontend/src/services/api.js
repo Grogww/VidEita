@@ -16,7 +16,8 @@ export default api
 
 export const reportsApi = {
   listar:          (params)      => api.get('/reports', { params }),
-  criar:           (fd)          => api.post('/reports', fd, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  criar:           (fd)          => api.post('/reports', fd, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 30000 }),
+  analisar:        (fd, signal)  => api.post('/reports/analise', fd, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 45000, signal }),
   nearby:          (lat,lng,r)   => api.get('/reports/nearby', { params:{ lat, lng, raio: r } }),
   atualizarStatus: (id, status)  => api.patch(`/reports/${id}/status`, { status }),
   deletar:         (id)          => api.delete(`/reports/${id}`),

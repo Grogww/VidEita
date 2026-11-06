@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
-import { ArrowLeft, ArrowRight, Upload, MapPin, CheckCircle, Loader, Image, X, User, UserX } from 'lucide-react'
+import { ArrowLeft, ArrowRight, MapPin, CheckCircle, Loader, Sparkles, User, UserX } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { reportsApi } from '../services/api'
 import Navbar from '../components/ui/Navbar'
+import PhotoAnalysisStep from '../components/reports/PhotoAnalysisStep'
+import { useImageAnalysis } from '../hooks/useImageAnalysis'
 
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -27,7 +29,22 @@ const CATS = [
   { v:'outro',       l:'Outro',               e:'📍' },
 ]
 
-const STEPS = ['Informações','Detalhes','Localização','Confirmação']
+const PRIORIDADES = [
+  { v:'baixa',   l:'Baixa' },
+  { v:'media',   l:'Média' },
+  { v:'alta',    l:'Alta' },
+  { v:'urgente', l:'Urgente' },
+]
+
+const ORGAOS = [
+  { v:'PREFEITURA', l:'Prefeitura' },
+  { v:'CELESC',     l:'CELESC' },
+  { v:'VISAN',      l:'VISAN' },
+]
+
+const CAMPOS_PADRAO = { categoria:'', titulo:'', descricao:'', prioridade:'media', orgao:'PREFEITURA' }
+
+const STEPS = ['Foto','Informações','Detalhes','Localização','Confirmação']
 
 function LocationPicker({ pos, setPos }) {
   useMapEvents({ click(e){ setPos([e.latlng.lat, e.latlng.lng]) } })
@@ -50,6 +67,8 @@ export default function NewReportPage() {
   const [cat, setCat]         = useState('')
   const [titulo, setTitulo]   = useState('')
   const [desc, setDesc]       = useState('')
+  const [prioridade, setPrioridade] = useState(CAMPOS_PADRAO.prioridade)
+  const [orgao, setOrgao]     = useState(CAMPOS_PADRAO.orgao)
   const [anonimo, setAnonimo] = useState(false)
   const [pos, setPos]         = useState(null)
   const [locationAccuracy, setLocationAccuracy] = useState(null)
@@ -58,13 +77,62 @@ export default function NewReportPage() {
   const [preview, setPreview] = useState(null)
   const [loading, setLoading] = useState(false)
   const [protocol, setProtocol] = useState(null)
+  const [sugestoesAtivas, setSugestoesAtivas] = useState(false)
+  const camposEditados = useRef(new Set())
+  const analise = useImageAnalysis()
   const navigate = useNavigate()
 
-  const handleImg = (e) => {
+  const setters = { categoria:setCat, titulo:setTitulo, descricao:setDesc, prioridade:setPrioridade, orgao:setOrgao }
+
+  const editarCampo = (campo, valor) => {
+    camposEditados.current.add(campo)
+    setters[campo](valor)
+  }
+
+  // A IA nunca sobrescreve o que o usuário já digitou.
+  const preencherCampos = (valores) => {
+    Object.entries(valores).forEach(([campo, valor]) => {
+      if (!camposEditados.current.has(campo)) setters[campo](valor)
+    })
+  }
+
+  const ignorarSugestoes = () => {
+    preencherCampos(CAMPOS_PADRAO)
+    setSugestoesAtivas(false)
+  }
+
+  const handleImg = async (e) => {
     const f = e.target.files[0]
     if (!f) return
     if (f.size > 15*1024*1024) { toast.error('Imagem muito grande (máx 15MB)'); return }
     setImg(f); setPreview(URL.createObjectURL(f))
+
+    const resultado = await analise.analisar(f)
+    if (resultado?.sugestoes) {
+      preencherCampos(resultado.sugestoes)
+      setSugestoesAtivas(true)
+    }
+  }
+
+  const removerFoto = () => {
+    analise.limpar()
+    setImg(null); setPreview(null)
+    ignorarSugestoes()
+  }
+
+  const tentarAnaliseNovamente = async () => {
+    const resultado = await analise.analisar(img)
+    if (resultado?.sugestoes) {
+      preencherCampos(resultado.sugestoes)
+      setSugestoesAtivas(true)
+    }
+  }
+
+  const novaOcorrencia = () => {
+    analise.limpar()
+    camposEditados.current.clear()
+    setStep(0);setCat('');setTitulo('');setDesc('');setPrioridade(CAMPOS_PADRAO.prioridade);setOrgao(CAMPOS_PADRAO.orgao)
+    setPos(null);setLocationAccuracy(null);setImg(null);setPreview(null);setSugestoesAtivas(false)
   }
 
 
@@ -105,9 +173,10 @@ export default function NewReportPage() {
   }
 
   const canNext = () => {
-    if (step===0) return !!cat
-    if (step===1) return titulo.trim().length >= 3
-    if (step===2) return !!pos
+    if (step===0) return analise.podeAvancar
+    if (step===1) return !!cat
+    if (step===2) return titulo.trim().length >= 3
+    if (step===3) return !!pos
     return true
   }
 
@@ -118,18 +187,19 @@ export default function NewReportPage() {
       fd.append('titulo', titulo); fd.append('descricao', desc)
       fd.append('categoria', cat); fd.append('latitude', pos[0]); fd.append('longitude', pos[1]); if (locationAccuracy) fd.append('precisao_metros', locationAccuracy)
       fd.append('anonimo', anonimo)
-      if (img) fd.append('imagem', img)
+      fd.append('prioridade', prioridade); fd.append('orgao', orgao)
+      if (img) { fd.append('imagem', img); fd.append('analise_id', analise.analiseId) }
       const { data } = await reportsApi.criar(fd)
       const id = data.data?.report?.id || ''
       setProtocol(`#VB-${new Date().getFullYear()}-${id.substring(0,5).toUpperCase()}`)
-      setStep(4)
+      setStep(5)
     } catch (err) {
       toast.error(err.response?.data?.mensagem || 'Erro ao criar Ocorrência')
     } finally { setLoading(false) }
   }
 
   // Success screen
-  if (step===4) return (
+  if (step===5) return (
     <div style={{ minHeight:'100vh', background:'var(--bg)' }}>
       <Navbar/>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'calc(100vh - 60px)', padding:24 }}>
@@ -148,7 +218,7 @@ export default function NewReportPage() {
             <button onClick={()=>navigate('/minhas-ocorrencias')} style={{ flex:1, padding:'12px 0', background:'var(--brand)', color:'white', border:'none', borderRadius:10, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'var(--font-body)' }}>
               Acompanhar Ocorrência
             </button>
-            <button onClick={()=>{ setStep(0);setCat('');setTitulo('');setDesc('');setPos(null);setLocationAccuracy(null);setImg(null);setPreview(null) }} style={{ flex:1, padding:'12px 0', background:'var(--bg2)', color:'var(--text)', border:'1px solid var(--border)', borderRadius:10, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'var(--font-body)' }}>
+            <button onClick={novaOcorrencia} style={{ flex:1, padding:'12px 0', background:'var(--bg2)', color:'var(--text)', border:'1px solid var(--border)', borderRadius:10, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'var(--font-body)' }}>
               Fazer nova Ocorrência
             </button>
           </div>
@@ -189,13 +259,29 @@ export default function NewReportPage() {
 
           <div className="newreport-card-body" style={{ padding:'28px 32px' }}>
 
-            {/* Step 0: categoria */}
+            {/* Step 0: foto */}
             {step===0&&(
+              <PhotoAnalysisStep
+                preview={preview}
+                nomeArquivo={img?.name}
+                estado={analise.estado}
+                mensagem={analise.mensagem}
+                sugestoesAtivas={sugestoesAtivas}
+                onSelect={handleImg}
+                onRemove={removerFoto}
+                onRetry={tentarAnaliseNovamente}
+                onIgnorar={ignorarSugestoes}
+              />
+            )}
+
+            {/* Step 1: categoria */}
+            {step===1&&(
               <div>
+                {sugestoesAtivas&&<div style={{ marginBottom:16 }}><Aviso/></div>}
                 <p style={{ fontSize:13, fontWeight:600, color:'var(--text2)', marginBottom:14, letterSpacing:.3 }}>CATEGORIA DA OCORRÊNCIA</p>
                 <div className="newreport-category-grid" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
                   {CATS.map(c=>(
-                    <button key={c.v} onClick={()=>setCat(c.v)} style={{ padding:'14px 16px', borderRadius:10, border:`1.5px solid ${cat===c.v?'var(--brand)':'var(--border)'}`, background:cat===c.v?'var(--brand-dim)':'var(--bg3)', cursor:'pointer', display:'flex', alignItems:'center', gap:10, fontSize:14, color:cat===c.v?'var(--brand)':'var(--text)', fontFamily:'var(--font-body)', fontWeight:cat===c.v?600:400, transition:'all .15s', textAlign:'left' }}>
+                    <button key={c.v} onClick={()=>editarCampo('categoria',c.v)} style={{ padding:'14px 16px', borderRadius:10, border:`1.5px solid ${cat===c.v?'var(--brand)':'var(--border)'}`, background:cat===c.v?'var(--brand-dim)':'var(--bg3)', cursor:'pointer', display:'flex', alignItems:'center', gap:10, fontSize:14, color:cat===c.v?'var(--brand)':'var(--text)', fontFamily:'var(--font-body)', fontWeight:cat===c.v?600:400, transition:'all .15s', textAlign:'left' }}>
                       <span style={{ fontSize:20 }}>{c.e}</span> {c.l}
                     </button>
                   ))}
@@ -203,30 +289,26 @@ export default function NewReportPage() {
               </div>
             )}
 
-            {/* Step 1: título + desc + anônimo */}
-            {step===1&&(
+            {/* Step 2: título + desc + prioridade + órgão + anônimo */}
+            {step===2&&(
               <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+                {sugestoesAtivas&&<Aviso/>}
                 <Field label="Título">
-                  <input type="text" placeholder="Resuma sua Ocorrência em poucas palavras" value={titulo} onChange={e=>setTitulo(e.target.value)} required maxLength={150} style={inp}/>
+                  <input type="text" placeholder="Resuma sua Ocorrência em poucas palavras" value={titulo} onChange={e=>editarCampo('titulo',e.target.value)} required maxLength={150} style={inp}/>
                 </Field>
                 <Field label="Descrição">
-                  <textarea placeholder="Descreva o que aconteceu com o máximo de detalhes possível" value={desc} onChange={e=>setDesc(e.target.value)} rows={4} maxLength={1000} style={{ ...inp, resize:'vertical', minHeight:100 }}/>
+                  <textarea placeholder="Descreva o que aconteceu com o máximo de detalhes possível" value={desc} onChange={e=>editarCampo('descricao',e.target.value)} rows={4} maxLength={1000} style={{ ...inp, resize:'vertical', minHeight:100 }}/>
                   <span style={{ fontSize:11, color:'var(--text3)', float:'right', marginTop:4 }}>{desc.length}/1000</span>
                 </Field>
-                <Field label="Foto (opcional)">
-                  {preview?(
-                    <div style={{ position:'relative' }}>
-                      <img src={preview} alt="preview" style={{ width:'100%', height:160, objectFit:'cover', borderRadius:10, border:'1px solid var(--border)' }}/>
-                      <button onClick={()=>{ setImg(null);setPreview(null) }} style={{ position:'absolute',top:8,right:8, background:'rgba(0,0,0,.6)', border:'none', borderRadius:'50%', width:28, height:28, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'white' }}><X size={14}/></button>
-                    </div>
-                  ):(
-                    <label style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:8, padding:24, border:'1.5px dashed var(--border2)', borderRadius:10, cursor:'pointer', background:'var(--bg3)', color:'var(--text3)' }}>
-                      <Image size={24}/>
-                      <span style={{ fontSize:13 }}>Clique para adicionar foto</span>
-                      <span style={{ fontSize:11 }}>JPEG, PNG, WebP, HEIC ou HEIF · máx 15MB</span>
-                      <input type="file" accept="image/*,.heic,.heif" onChange={handleImg} style={{ display:'none' }}/>
-                    </label>
-                  )}
+                <Field label="Prioridade">
+                  <select value={prioridade} onChange={e=>editarCampo('prioridade',e.target.value)} style={inp}>
+                    {PRIORIDADES.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
+                  </select>
+                </Field>
+                <Field label="Órgão responsável">
+                  <select value={orgao} onChange={e=>editarCampo('orgao',e.target.value)} style={inp}>
+                    {ORGAOS.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
+                  </select>
                 </Field>
                 <Field label="Deseja se identificar?" last>
                   <div className="newreport-choice-grid" style={{ display:'flex', gap:10 }}>
@@ -241,8 +323,8 @@ export default function NewReportPage() {
               </div>
             )}
 
-            {/* Step 2: localização */}
-            {step===2&&(
+            {/* Step 3: localização */}
+            {step===3&&(
               <div>
                 <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:14 }}>
                   <button type="button" onClick={usarMinhaLocalizacao} disabled={locating} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, width:'100%', padding:'12px 14px', background:locating?'var(--surface)':'var(--brand)', color:locating?'var(--text3)':'white', border:'none', borderRadius:10, cursor:locating?'not-allowed':'pointer', fontSize:14, fontWeight:700, fontFamily:'var(--font-body)', boxShadow:locating?'none':'0 4px 16px rgba(107,63,160,.25)' }}>
@@ -272,12 +354,14 @@ export default function NewReportPage() {
               </div>
             )}
 
-            {/* Step 3: confirmação */}
-            {step===3&&(
+            {/* Step 4: confirmação */}
+            {step===4&&(
               <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
                 <SummaryRow label="Categoria"    val={CATS.find(c=>c.v===cat)?.l||cat} emoji={CATS.find(c=>c.v===cat)?.e}/>
                 <SummaryRow label="Título"       val={titulo}/>
                 {desc&&<SummaryRow label="Descrição" val={desc}/>}
+                <SummaryRow label="Prioridade"   val={PRIORIDADES.find(p=>p.v===prioridade)?.l}/>
+                <SummaryRow label="Órgão"        val={ORGAOS.find(o=>o.v===orgao)?.l}/>
                 <SummaryRow label="Localização"  val={pos?`${pos[0].toFixed(5)}, ${pos[1].toFixed(5)}${locationAccuracy ? ` · precisão aprox. ${locationAccuracy}m` : ''}`:'Não informada'}/>
                 <SummaryRow label="Identificação" val={anonimo?'Anônimo':'Identificado'}/>
                 {preview&&(
@@ -302,7 +386,7 @@ export default function NewReportPage() {
               ))}
             </div>
 
-            {step<3?(
+            {step<4?(
               <button onClick={()=>setStep(s=>s+1)} disabled={!canNext()} style={{ display:'flex', alignItems:'center', gap:6, padding:'10px 20px', background:'var(--brand)', border:'none', borderRadius:9, color:'white', cursor:canNext()?'pointer':'not-allowed', fontSize:14, fontWeight:600, fontFamily:'var(--font-body)', opacity:canNext()?1:.5, boxShadow:'0 3px 12px rgba(107,63,160,.3)' }}>
                 Continuar <ArrowRight size={14}/>
               </button>
@@ -324,6 +408,14 @@ function Field({ label, children, last }) {
     <div style={{ marginBottom:last?0:0 }}>
       <label style={{ display:'block', fontSize:11, fontWeight:600, color:'var(--text2)', marginBottom:7, letterSpacing:.3 }}>{label.toUpperCase()}</label>
       {children}
+    </div>
+  )
+}
+
+function Aviso() {
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 12px', borderRadius:9, background:'var(--brand-dim)', border:'1px solid var(--brand-border)', color:'var(--brand)', fontSize:12, fontWeight:500 }}>
+      <Sparkles size={14} style={{ flexShrink:0 }}/> Sugerido a partir da foto. Revise e edite o que precisar.
     </div>
   )
 }
