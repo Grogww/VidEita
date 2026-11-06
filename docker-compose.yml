@@ -22,9 +22,10 @@ services:
       retries: 30
 
   minio:
-    # ATENÇÃO: em 2026-11-05 o pull de minio/minio falhou (Docker Hub e Quay).
+    # Silo: fork mantido do MinIO, compatível com o SDK e com as variáveis MINIO_*.
+    # A imagem minio/minio foi descontinuada. Mantenha a versão fixa e atualize com testes.
     # MINIO_IMAGE permite trocar a imagem pelo .env sem editar este arquivo.
-    image: ${MINIO_IMAGE:-minio/minio:latest}
+    image: ${MINIO_IMAGE:-pgsty/silo:RELEASE.2026-10-26T00-00-00Z}
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:

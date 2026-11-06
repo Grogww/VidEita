@@ -54,8 +54,8 @@ Devem aparecer `mysql`, `minio`, `backend`, `nginx` e `adminer` como `Up`. Depoi
 
 ## Credenciais de demonstração
 
-Valem **somente quando não existe um `.env` na raiz** (são os valores padrão do
-`docker-compose.yml`). Se você definir qualquer variável no `.env`, ela substitui o padrão.
+São os valores padrão do `docker-compose.yml`. Cada um vale enquanto a variável correspondente
+não estiver definida no `.env` da raiz.
 
 | Serviço | Onde acessar | Usuário | Senha (demo) |
 |---|---|---|---|
@@ -86,6 +86,7 @@ docker compose up --build -d
 | `DB_NAME`, `DB_USER`, `DB_PASSWORD` | Banco de dados da aplicação | valores de demonstração |
 | `MYSQL_ROOT_PASSWORD` | Senha do root do MySQL | valor de demonstração |
 | `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` | Credenciais do MinIO | valores de demonstração |
+| `MINIO_IMAGE` | Imagem Docker do armazenamento | `pgsty/silo:RELEASE.2026-10-26T00-00-00Z` |
 | `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_NAME` | Administrador do sistema | valores de demonstração |
 | `JWT_SECRET` | Assinatura dos tokens de login | **vazio**: o backend gera um segredo aleatório a cada início (as sessões caem ao reiniciar) |
 | `JWT_EXPIRES_IN` | Validade do token | `7d` |
@@ -163,6 +164,11 @@ salvos no MinIO.
 O banco guarda apenas o caminho da imagem (por exemplo, `/files/report-123456789.png`), e o
 navegador a acessa pelo Nginx em `http://localhost:8080/files/<nome-do-arquivo>`. O
 navegador nunca fala direto com o MinIO.
+
+O serviço `minio` usa a imagem do [Silo](https://github.com/pgsty/silo), fork do MinIO mantido
+pela comunidade, porque a imagem oficial `minio/minio` foi descontinuada. O protocolo, as
+variáveis `MINIO_*` e o SDK continuam os mesmos, então o restante deste guia segue chamando o
+serviço de MinIO.
 
 ---
 
