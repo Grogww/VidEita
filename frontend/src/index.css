@@ -582,10 +582,6 @@ svg {
     left: 16px !important;
     bottom: max(22px, calc(env(safe-area-inset-bottom) + 18px)) !important;
   }
-
-  .leaflet-control-attribution {
-    display: none !important;
-  }
 }
 
 @media (max-width: 480px) {
@@ -896,17 +892,6 @@ svg {
   padding: 0 !important;
   box-shadow: none !important;
   background: transparent !important;
-}
-
-@media (max-width: 768px) {
-  .leaflet-container .leaflet-tile {
-    width: 257px !important;
-    height: 257px !important;
-  }
-
-  .leaflet-control-attribution {
-    display: none !important;
-  }
 }
 
 .leaflet-container .leaflet-tile-pane,

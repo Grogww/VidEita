@@ -1,23 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet'
-import L from 'leaflet'
+import { Marker, useMap, useMapEvents } from 'react-leaflet'
 import { ArrowLeft, ArrowRight, MapPin, CheckCircle, Loader, Sparkles, User, UserX } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { reportsApi } from '../services/api'
 import Navbar from '../components/ui/Navbar'
 import PhotoAnalysisStep from '../components/reports/PhotoAnalysisStep'
 import { useImageAnalysis } from '../hooks/useImageAnalysis'
-
-delete L.Icon.Default.prototype._getIconUrl
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-})
-
-const VIDEIRA_CENTER = [-27.0089, -51.1505]
-const VIDEIRA_BOUNDS = [[-27.05, -51.21], [-26.97, -51.06]]
+import VideiraMap, { VIDEIRA_CENTER } from '../components/map/VideiraMap'
 
 const CATS = [
   { v:'buraco',      l:'Buraco na via',       e:'🕳️' },
@@ -345,11 +335,10 @@ export default function NewReportPage() {
                   )}
                 </div>
                 <div className="newreport-map" style={{ borderRadius:12, overflow:'hidden', border:'1px solid var(--border)', height:360 }}>
-                  <MapContainer center={pos || VIDEIRA_CENTER} zoom={pos ? 16 : 14} maxBounds={VIDEIRA_BOUNDS} maxBoundsViscosity={0.6} minZoom={12} maxZoom={18} style={{ height:'100%', width:'100%', cursor:'crosshair' }} zoomControl={false}>
-                    <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"/>
+                  <VideiraMap center={pos || VIDEIRA_CENTER} zoom={pos ? 16 : 14} style={{ cursor:'crosshair' }}>
                     <MapAutoCenter pos={pos}/>
                     <LocationPicker pos={pos} setPos={marcarLocalManual}/>
-                  </MapContainer>
+                  </VideiraMap>
                 </div>
               </div>
             )}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { MapContainer, TileLayer, CircleMarker, Marker, Popup, useMap } from 'react-leaflet'
+import { CircleMarker, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { Link } from 'react-router-dom'
 import { Filter, Plus, RefreshCw, Loader, MapPin, X, LocateFixed } from 'lucide-react'
@@ -8,12 +8,7 @@ import { reportsApi } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/ui/Navbar'
 import ReportPopup from '../components/reports/ReportPopup'
-
-// Videira-SC bounding box — limita o mapa à cidade
-const VIDEIRA_CENTER = [-27.0089, -51.1505]
-const VIDEIRA_BOUNDS = [[-27.075, -51.235], [-26.945, -51.035]]
-const VIDEIRA_MIN_ZOOM = 13
-const VIDEIRA_MAX_ZOOM = 18
+import VideiraMap from '../components/map/VideiraMap'
 
 const STATUS_CFG = {
   pendente: { label: 'Pendente', color: '#F59E0B', bg: '#FEF3C7' },
@@ -51,10 +46,12 @@ const getStatusColor = (status) => {
   return STATUS_CFG[key]?.color || STATUS_CFG.pendente.color || '#6B3FA0'
 }
 
+const pinIcons = {}
+
 const makePinIcon = (status) => {
   const color = getStatusColor(status)
 
-  return L.divIcon({
+  return pinIcons[color] ||= L.divIcon({
     className: 'videita-pin-marker',
     html: `
       <div style="
@@ -91,32 +88,6 @@ const makePinIcon = (status) => {
     iconAnchor: [21, 48],
     popupAnchor: [0, -46],
   })
-}
-
-// Constrains map view to Videira bounds
-function BoundsEnforcer() {
-  const map = useMap()
-
-  useEffect(() => {
-    map.setMaxBounds(VIDEIRA_BOUNDS)
-    map.setMinZoom(VIDEIRA_MIN_ZOOM)
-    map.setMaxZoom(VIDEIRA_MAX_ZOOM)
-
-    const fixSize = () => {
-      setTimeout(() => map.invalidateSize(), 120)
-    }
-
-    fixSize()
-    window.addEventListener('resize', fixSize)
-    window.addEventListener('orientationchange', fixSize)
-
-    return () => {
-      window.removeEventListener('resize', fixSize)
-      window.removeEventListener('orientationchange', fixSize)
-    }
-  }, [map])
-
-  return null
 }
 
 function FlyToUserLocation({ position }) {
@@ -575,22 +546,7 @@ export default function MapPage() {
           </span>
         </div>
 
-        <MapContainer
-          center={VIDEIRA_CENTER}
-          zoom={14}
-          maxBounds={VIDEIRA_BOUNDS}
-          maxBoundsViscosity={0.85}
-          minZoom={VIDEIRA_MIN_ZOOM}
-          maxZoom={VIDEIRA_MAX_ZOOM}
-          style={{ height: '100%', width: '100%' }}
-          zoomControl={false}
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-
-          <BoundsEnforcer />
+        <VideiraMap>
           <FlyToUserLocation position={userLocation} />
 
           {userLocation && (
@@ -641,7 +597,7 @@ export default function MapPage() {
               </Marker>
             )
           })}
-        </MapContainer>
+        </VideiraMap>
       </div>
     </div>
   )
