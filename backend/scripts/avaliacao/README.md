@@ -3,6 +3,8 @@
 Roda o prompt de produção (`src/services/ai`) sobre 40 imagens com gabarito e gera um relatório de acertos e falhas.
 Cada imagem é analisada uma única vez por versão do prompt, para economizar a cota gratuita do Gemini.
 
+Os resultados das execuções estão em [RESULTADOS.md](RESULTADOS.md).
+
 ## Conjunto de imagens
 
 O `manifesto.json` lista as 40 imagens, com origem, licença, autor, SHA-256 e gabarito:
