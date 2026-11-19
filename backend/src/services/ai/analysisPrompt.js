@@ -62,6 +62,12 @@ const RESPONSE_SCHEMA = {
   required: ['veredito', 'motivo', 'areas_sensiveis'],
 };
 
+// A classificação não exige raciocínio longo, e a resolução média reduz pela metade os tokens da imagem.
+const CONFIG_GERACAO = {
+  thinkingConfig: { thinkingLevel: 'MEDIUM' },
+  mediaResolution: 'MEDIA_RESOLUTION_MEDIUM',
+};
+
 module.exports = {
   CATEGORIAS,
   PRIORIDADES,
@@ -71,4 +77,5 @@ module.exports = {
   SYSTEM_PROMPT,
   USER_PROMPT,
   RESPONSE_SCHEMA,
+  CONFIG_GERACAO,
 };
