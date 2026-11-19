@@ -57,7 +57,12 @@ class GeminiClient {
       return { bloqueioSeguranca: true, motivoSeguranca, dados: null };
     }
 
-    return { bloqueioSeguranca: false, motivoSeguranca: null, dados: JSON.parse(response.text) };
+    return {
+      bloqueioSeguranca: false,
+      motivoSeguranca: null,
+      dados: JSON.parse(response.text),
+      uso: response.usageMetadata ?? null,
+    };
   }
 }
 
