@@ -100,3 +100,8 @@ Desktop.ini
 *.swo
 .vscode/*
 !.vscode/tasks.json
+
+# ---------------------------------------------------------------
+# Avaliação do prompt (imagens baixadas e respostas do Gemini)
+# ---------------------------------------------------------------
+backend/scripts/avaliacao/dados/
