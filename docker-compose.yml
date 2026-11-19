@@ -82,6 +82,8 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.6-flash}
       GEMINI_TIMEOUT_MS: ${GEMINI_TIMEOUT_MS:-40000}
+      # true libera o envio da foto quando a análise falha (apenas para testes).
+      PERMITIR_CADASTRO_SEM_ANALISE: ${PERMITIR_CADASTRO_SEM_ANALISE:-false}
     ports:
       - "127.0.0.1:3000:3000"
     volumes:

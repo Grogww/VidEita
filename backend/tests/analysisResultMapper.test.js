@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { mapear } = require('../src/services/ai/AnalysisResultMapper');
+const { mapear, extrairAreas, areasDoLog, MENSAGENS } = require('../src/services/ai/AnalysisResultMapper');
 
 const resposta = (dados) => ({ bloqueioSeguranca: false, motivoSeguranca: null, dados });
 
@@ -67,4 +67,33 @@ test('recusa de segurança do modelo conta como imprópria', () => {
 test('resposta fora do formato gera erro', () => {
   assert.throws(() => mapear(resposta(null)));
   assert.throws(() => mapear(resposta({ veredito: 'talvez' })));
+});
+
+test('áreas sensíveis inválidas são descartadas', () => {
+  const areas = extrairAreas([
+    { tipo: 'rosto', box_2d: [120, 300, 260, 380] },
+    { tipo: 'placa', box_2d: [610, 700, 660] },
+    { tipo: 'placa', box_2d: [610, 700, 660, 1200] },
+    { tipo: 'documento', box_2d: [500, 500, 400, 600] },
+    { tipo: 'rosto', box_2d: ['1', 2, 3, 4] },
+    null,
+  ]);
+  assert.deepEqual(areas, [[120, 300, 260, 380]]);
+  assert.deepEqual(extrairAreas(undefined), []);
+});
+
+test('mensagem avisa quando a foto será censurada', () => {
+  const base = { veredito: 'valida', motivo: 'ok' };
+  assert.equal(mapear(resposta({ ...base, areas_sensiveis: [] })).mensagem, MENSAGENS.aprovada);
+  assert.equal(
+    mapear(resposta({ ...base, areas_sensiveis: [{ tipo: 'rosto', box_2d: [1, 2, 3, 4] }] })).mensagem,
+    MENSAGENS.aprovada_com_censura
+  );
+});
+
+test('áreas são lidas do log salvo, como objeto ou texto JSON', () => {
+  const resposta_json = { dados: { areas_sensiveis: [{ tipo: 'placa', box_2d: [10, 20, 30, 40] }] } };
+  assert.deepEqual(areasDoLog({ resposta_json }), [[10, 20, 30, 40]]);
+  assert.deepEqual(areasDoLog({ resposta_json: JSON.stringify(resposta_json) }), [[10, 20, 30, 40]]);
+  assert.deepEqual(areasDoLog({ resposta_json: null }), []);
 });

@@ -1,6 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const ImageAnalysisService = require('../src/services/ai/ImageAnalysisService');
+const { MENSAGENS } = require('../src/services/ai/AnalysisResultMapper');
 
 const criarLogs = () => {
   const registros = new Map();
@@ -25,12 +26,15 @@ const criarLogs = () => {
   };
 };
 
-const criarServico = (analisar, { configurado = true } = {}) => {
+const criarServico = (analisar, { configurado = true, permitirSemAnalise = false } = {}) => {
   const logs = criarLogs();
   const client = { modelo: 'modelo-teste', estaConfigurado: () => configurado, analisar };
   const preparer = { preparar: async () => ({ buffer: Buffer.from('preparada'), mimeType: 'image/jpeg' }) };
-  return { service: new ImageAnalysisService({ client, preparer, logs }), logs };
+  return { service: new ImageAnalysisService({ client, preparer, logs, permitirSemAnalise }), logs };
 };
+
+const falhar = async () => { throw new Error('timeout'); };
+const primeiroLog = (logs) => [...logs.registros.values()][0];
 
 const aprovar = async () => ({
   bloqueioSeguranca: false,
@@ -74,14 +78,24 @@ test('bloqueada não devolve analise_id, mas fica na auditoria', async () => {
   assert.equal(logs.registros.size, 1);
 });
 
-test('falha do Gemini vira indisponível e registra o erro', async () => {
-  const { service, logs } = criarServico(async () => { throw new Error('timeout'); });
+test('falha do Gemini vira indisponível, registra o erro e não libera o envio por padrão', async () => {
+  const { service, logs } = criarServico(falhar);
+  const r = await service.analisar(file, 'user-1');
+
+  assert.equal(r.resultado, 'indisponivel');
+  assert.equal(r.analise_id, null);
+  assert.equal(r.sugestoes, null);
+  assert.equal(r.motivo, MENSAGENS.indisponivel_sem_envio);
+  assert.equal(primeiroLog(logs).erro, 'timeout');
+});
+
+test('com PERMITIR_CADASTRO_SEM_ANALISE, análise indisponível libera o envio', async () => {
+  const { service } = criarServico(falhar, { permitirSemAnalise: true });
   const r = await service.analisar(file, 'user-1');
 
   assert.equal(r.resultado, 'indisponivel');
   assert.ok(r.analise_id);
-  assert.equal(r.sugestoes, null);
-  assert.equal(logs.registros.get(r.analise_id).erro, 'timeout');
+  assert.equal(r.motivo, MENSAGENS.indisponivel);
 });
 
 test('resposta inválida da IA vira indisponível', async () => {
@@ -97,7 +111,7 @@ test('sem chave não chama a IA', async () => {
 
   assert.equal(chamou, false);
   assert.equal(r.resultado, 'indisponivel');
-  assert.match(logs.registros.get(r.analise_id).erro, /GEMINI_API_KEY/);
+  assert.match(primeiroLog(logs).erro, /GEMINI_API_KEY/);
 });
 
 test('imagem ilegível devolve 422 e não chega à IA', async () => {
@@ -116,10 +130,17 @@ test('validarParaEnvio aceita a mesma foto do mesmo usuário', async () => {
   assert.equal(log.id, analise_id);
 });
 
-test('validarParaEnvio aceita análise indisponível', async () => {
-  const { service } = criarServico(async () => { throw new Error('fora do ar'); });
-  const { analise_id } = await service.analisar(file, 'user-1');
-  await service.validarParaEnvio(analise_id, file, 'user-1');
+test('validarParaEnvio aceita análise indisponível só com a configuração ligada', async () => {
+  const liberado = criarServico(falhar, { permitirSemAnalise: true });
+  const { analise_id } = await liberado.service.analisar(file, 'user-1');
+  await liberado.service.validarParaEnvio(analise_id, file, 'user-1');
+
+  const bloqueado = criarServico(falhar);
+  await bloqueado.service.analisar(file, 'user-1');
+  await assert.rejects(
+    bloqueado.service.validarParaEnvio(primeiroLog(bloqueado.logs).id, file, 'user-1'),
+    statusDoErro(422)
+  );
 });
 
 test('validarParaEnvio recusa envio sem análise', async () => {

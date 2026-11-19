@@ -139,6 +139,10 @@ test('fluxo completo: analisa, envia e vincula a auditoria', async () => {
   assert.equal(arquivosSalvos().length, 1);
   assert.equal(logs.get(analise_id).report_id, 'report-1');
 
+  const salva = await sharp(path.join(uploadDir, arquivosSalvos()[0])).metadata();
+  assert.equal(salva.format, 'jpeg');
+  assert.equal(salva.exif, undefined);
+
   const report = reportsCriados.at(-1);
   assert.equal(report.prioridade, 'alta');
   assert.equal(report.orgao_id, 7);

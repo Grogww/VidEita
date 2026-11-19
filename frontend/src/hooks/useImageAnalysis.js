@@ -45,7 +45,9 @@ export function useImageAnalysis() {
       const { data } = await reportsApi.analisar(fd, controller.signal)
       const analise = data.data
 
-      setEstado(ESTADO_POR_RESULTADO[analise.resultado] || 'erro')
+      // Sem analise_id, a foto não pode ser enviada: o usuário tenta de novo ou remove a foto.
+      const semEnvio = analise.resultado === 'indisponivel' && !analise.analise_id
+      setEstado(semEnvio ? 'erro' : ESTADO_POR_RESULTADO[analise.resultado] || 'erro')
       setMensagem(analise.motivo)
       setAnaliseId(analise.analise_id)
       return analise

@@ -3,6 +3,8 @@ const Orgao = require('../models/Orgao');
 const AiAnalysisLog = require('../models/AiAnalysisLog');
 const { uploadParaCloudinary, removerDoCloudinary } = require('../services/uploadService');
 const { filtrarPorProximidade } = require('../services/mapService');
+const { censurarImagem } = require('../services/imageCensor');
+const { areasDoLog } = require('../services/ai/AnalysisResultMapper');
 const { PRIORIDADES, ORGAOS } = require('../services/ai/analysisPrompt');
 const { imageAnalysisService } = require('./AnalysisController');
 const { createError } = require('../middlewares/errorMiddleware');
@@ -35,10 +37,11 @@ const createReport = async (req, res, next) => {
     if (req.file) {
       analise = await imageAnalysisService.validarParaEnvio(analise_id, req.file, req.user.id);
 
-      const uploaded = await uploadParaCloudinary(req.file);
+      const censurada = await censurarImagem(req.file, areasDoLog(analise));
+      const uploaded = await uploadParaCloudinary(censurada);
       imagem_url = uploaded.url;
       imagem_public_id = uploaded.public_id;
-      mime_type = uploaded.mime_type || req.file.mimetype;
+      mime_type = uploaded.mime_type;
     }
 
     const report = await Report.create({
