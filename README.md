@@ -95,6 +95,7 @@ docker compose up --build -d
 | `GEMINI_API_KEY` | Chave da análise de imagens | vazio (ocorrências seguem sem análise) |
 | `GEMINI_MODEL` | Modelo usado na análise | `gemini-3.6-flash` |
 | `GEMINI_TIMEOUT_MS` | Tempo máximo de espera pela IA, somando as novas tentativas | `40000` |
+| `PERMITIR_CADASTRO_SEM_ANALISE` | Libera o envio da foto quando a análise falha. Use `true` só em testes | `false` |
 
 Para gerar um `JWT_SECRET` forte:
 
@@ -178,9 +179,11 @@ Ao anexar uma foto na Nova Ocorrência, o backend a analisa com o Gemini antes d
 
 | Resultado | O que acontece |
 |---|---|
-| `aprovada` | Sugere categoria, título, descrição, prioridade e órgão. O usuário pode editar ou ignorar. |
+| `aprovada` | Sugere categoria, título, descrição, prioridade e órgão. O usuário pode editar ou ignorar. Rostos, placas e documentos visíveis são pixelizados no envio. |
 | `bloqueada_impropria` / `bloqueada_fora_escopo` | A imagem não é armazenada e não pode ser enviada. O usuário pode trocá-la ou seguir sem foto. |
-| `indisponivel` | Sem chave, com timeout ou cota esgotada. A ocorrência segue sem sugestões. |
+| `indisponivel` | Sem chave, com timeout ou cota esgotada. Por padrão, a foto não pode ser enviada: o usuário tenta de novo ou segue sem foto. Com `PERMITIR_CADASTRO_SEM_ANALISE=true`, segue sem sugestões e sem censura. |
+
+Toda foto enviada é regravada em JPEG sem EXIF, o que remove a localização GPS gravada pelo celular.
 
 Para ativar, crie uma chave no [Google AI Studio](https://aistudio.google.com) e adicione ao
 `.env` da raiz:

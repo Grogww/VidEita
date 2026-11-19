@@ -5,8 +5,6 @@ const GeminiClient = require('./GeminiClient');
 const ImagePreparer = require('./ImagePreparer');
 const { mapear, MENSAGENS } = require('./AnalysisResultMapper');
 
-const RESULTADOS_ENVIAVEIS = ['aprovada', 'indisponivel'];
-
 const calcularHash = (buffer) => createHash('sha256').update(buffer).digest('hex');
 
 class ImageAnalysisService {
@@ -14,10 +12,12 @@ class ImageAnalysisService {
     client = new GeminiClient(),
     preparer = new ImagePreparer(),
     logs = AiAnalysisLog,
+    permitirSemAnalise = process.env.PERMITIR_CADASTRO_SEM_ANALISE === 'true',
   } = {}) {
     this.client = client;
     this.preparer = preparer;
     this.logs = logs;
+    this.permitirSemAnalise = permitirSemAnalise;
   }
 
   async analisar(file, userId) {
@@ -42,15 +42,22 @@ class ImageAnalysisService {
       erro,
     });
 
+    const podeEnviar = this.#podeEnviar(analise.resultado);
+    const bloqueadaSemAnalise = analise.resultado === 'indisponivel' && !podeEnviar;
+
     return {
       resultado: analise.resultado,
-      analise_id: RESULTADOS_ENVIAVEIS.includes(analise.resultado) ? log.id : null,
-      motivo: analise.mensagem,
+      analise_id: podeEnviar ? log.id : null,
+      motivo: bloqueadaSemAnalise ? MENSAGENS.indisponivel_sem_envio : analise.mensagem,
       sugestoes: analise.sugestoes,
     };
   }
 
-  // Falha da IA não impede o registro: a ocorrência segue sem sugestões.
+  #podeEnviar(resultado) {
+    return resultado === 'aprovada' || (resultado === 'indisponivel' && this.permitirSemAnalise);
+  }
+
+  // Falha da IA vira "indisponivel"; o envio depende de PERMITIR_CADASTRO_SEM_ANALISE.
   async #consultarIa(imagem) {
     const indisponivel = { resultado: 'indisponivel', motivo: null, mensagem: MENSAGENS.indisponivel, sugestoes: null };
 
@@ -79,8 +86,8 @@ class ImageAnalysisService {
       throw createError(naoAnalisada, 422);
     }
 
-    if (!RESULTADOS_ENVIAVEIS.includes(log.resultado)) {
-      throw createError('Esta imagem foi bloqueada e não pode ser enviada', 422);
+    if (!this.#podeEnviar(log.resultado)) {
+      throw createError('Esta imagem não foi aprovada na análise e não pode ser enviada', 422);
     }
 
     if (!(await this.logs.consumir(log.id))) {
