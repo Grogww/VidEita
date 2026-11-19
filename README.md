@@ -212,6 +212,15 @@ FROM ai_analysis_logs ORDER BY criado_em DESC;
 No plano gratuito da Gemini API, o Google pode usar o conteúdo enviado para melhorar seus
 produtos. Para fotos reais de cidadãos, use uma chave de projeto com faturamento ativo.
 
+### Validação do prompt
+
+O prompt foi avaliado sobre 40 imagens públicas com gabarito, incluindo fotos noturnas, borradas
+e com instrução falsa escrita na imagem. Veja em [`backend/scripts/avaliacao`](backend/scripts/avaliacao):
+
+- [Resultados e análises](backend/scripts/avaliacao/RESULTADOS.md): precisão, tempo de resposta,
+  instabilidade do plano gratuito e comparação com um modelo mais leve.
+- [Como rodar a avaliação](backend/scripts/avaliacao/README.md).
+
 Testes automatizados do backend (não precisam de banco nem de chave):
 
 ```bash

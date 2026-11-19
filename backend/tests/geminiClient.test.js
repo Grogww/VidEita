@@ -25,6 +25,8 @@ test('envia a imagem em base64 e exige resposta no schema', async () => {
   assert.equal(chamadas[0].config.responseMimeType, 'application/json');
   assert.ok(chamadas[0].config.responseJsonSchema);
   assert.ok(chamadas[0].config.abortSignal instanceof AbortSignal);
+  assert.equal(chamadas[0].config.thinkingConfig.thinkingLevel, 'MEDIUM');
+  assert.equal(chamadas[0].config.mediaResolution, 'MEDIA_RESOLUTION_MEDIUM');
 });
 
 test('detecta bloqueio no prompt', async () => {

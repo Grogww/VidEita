@@ -1,5 +1,5 @@
 const { GoogleGenAI } = require('@google/genai');
-const { SYSTEM_PROMPT, USER_PROMPT, RESPONSE_SCHEMA } = require('./analysisPrompt');
+const { SYSTEM_PROMPT, USER_PROMPT, RESPONSE_SCHEMA, CONFIG_GERACAO } = require('./analysisPrompt');
 
 const MOTIVOS_DE_SEGURANCA = new Set([
   'SAFETY',
@@ -30,10 +30,13 @@ class GeminiClient {
     return Boolean(this.apiKey);
   }
 
-  async analisar(buffer, mimeType) {
+  obterSdk() {
     if (!this.sdk) this.sdk = new GoogleGenAI({ apiKey: this.apiKey });
+    return this.sdk;
+  }
 
-    const response = await this.sdk.models.generateContent({
+  montarRequisicao(buffer, mimeType, timeoutMs = this.timeoutMs) {
+    return {
       model: this.modelo,
       contents: [
         { inlineData: { data: buffer.toString('base64'), mimeType } },
@@ -43,11 +46,16 @@ class GeminiClient {
         systemInstruction: SYSTEM_PROMPT,
         responseMimeType: 'application/json',
         responseJsonSchema: RESPONSE_SCHEMA,
+        ...CONFIG_GERACAO,
         httpOptions: { retryOptions: NOVAS_TENTATIVAS },
         // Vale para todas as tentativas somadas.
-        abortSignal: AbortSignal.timeout(this.timeoutMs),
+        abortSignal: AbortSignal.timeout(timeoutMs),
       },
-    });
+    };
+  }
+
+  async analisar(buffer, mimeType) {
+    const response = await this.obterSdk().models.generateContent(this.montarRequisicao(buffer, mimeType));
 
     const motivoBloqueio = response.promptFeedback?.blockReason;
     const motivoFim = response.candidates?.[0]?.finishReason;

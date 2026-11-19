@@ -3,6 +3,8 @@
 Roda o prompt de produção (`src/services/ai`) sobre 40 imagens com gabarito e gera um relatório de acertos e falhas.
 Cada imagem é analisada uma única vez por versão do prompt, para economizar a cota gratuita do Gemini.
 
+Os resultados das execuções estão em [RESULTADOS.md](RESULTADOS.md).
+
 ## Conjunto de imagens
 
 O `manifesto.json` lista as 40 imagens, com origem, licença, autor, SHA-256 e gabarito:
@@ -32,7 +34,7 @@ node scripts/avaliacao/avaliarPrompt.js
 ```
 
 - Os resultados ficam em `dados/resultados/<versão>/`, com um JSON por imagem e o `relatorio.md`.
-- A versão é um hash do prompt, do schema e do modelo. Ao mudar qualquer um deles, as imagens são analisadas de novo numa pasta nova.
+- A versão é um hash do prompt, do schema, da configuração de geração (`CONFIG_GERACAO`) e do modelo. Ao mudar qualquer um deles, as imagens são analisadas de novo numa pasta nova.
 - Ao atingir o limite por minuto, o script espera e tenta de novo. Se a cota diária acabar, ele para e informa quantas imagens faltam: troque a chave e rode o mesmo comando.
 - `AVALIACAO_PAUSA_MS` define a pausa entre chamadas. O padrão é 13000 ms, cerca de 4 por minuto.
 
@@ -42,5 +44,19 @@ Opções:
 |---|---|
 | `--relatorio` | Só gera o relatório com o que já foi analisado, sem chamar a API |
 | `--refazer-erros` | Analisa de novo os casos que tiveram erro técnico (timeout, rede, servidor) |
+| `--erros-da-versao <versão>` | Roda a versão atual só nos casos com erro técnico na versão indicada |
 
 Respostas fora do formato não são refeitas, porque contam como falha do prompt.
+
+## Diagnóstico de timeouts
+
+Para descobrir em que fase uma análise demora, use o diagnóstico em streaming. Ele mostra quando chega o primeiro retorno, o resumo do raciocínio, o texto gerado e um eventual bloqueio:
+
+```powershell
+node scripts/avaliacao/diagnosticarStream.js buraco-03 buraco-04
+node scripts/avaliacao/diagnosticarStream.js buraco-03 --config-original
+```
+
+- Cada imagem gasta uma chamada da cota.
+- `--config-original` usa os padrões do Gemini (pensamento alto e resolução alta), sem o `CONFIG_GERACAO`.
+- Os registros ficam em `dados/diagnosticos/`.
