@@ -7,7 +7,7 @@ require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env') });
 const GeminiClient = require('../../src/services/ai/GeminiClient');
 const ImagePreparer = require('../../src/services/ai/ImagePreparer');
 const { mapear } = require('../../src/services/ai/AnalysisResultMapper');
-const { SYSTEM_PROMPT, USER_PROMPT, RESPONSE_SCHEMA } = require('../../src/services/ai/analysisPrompt');
+const { SYSTEM_PROMPT, USER_PROMPT, RESPONSE_SCHEMA, CONFIG_GERACAO } = require('../../src/services/ai/analysisPrompt');
 const { gerarRelatorio } = require('./relatorio');
 
 const RAIZ = __dirname;
@@ -15,9 +15,9 @@ const sha256 = (dados) => createHash('sha256').update(dados).digest('hex');
 const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
 const lerJson = async (arquivo) => JSON.parse(await fs.readFile(arquivo, 'utf8'));
 
-// Qualquer mudança no prompt, no schema ou no modelo gera uma versão nova e reabre as análises.
+// Qualquer mudança no prompt, no schema, na configuração ou no modelo gera uma versão nova e reabre as análises.
 const versaoDoPrompt = (modelo) =>
-  sha256([SYSTEM_PROMPT, USER_PROMPT, JSON.stringify(RESPONSE_SCHEMA), modelo].join('\n')).slice(0, 12);
+  sha256([SYSTEM_PROMPT, USER_PROMPT, JSON.stringify(RESPONSE_SCHEMA), JSON.stringify(CONFIG_GERACAO), modelo].join('\n')).slice(0, 12);
 
 class CotaEsgotada extends Error {}
 
@@ -105,7 +105,7 @@ async function avaliar({
 
   return {
     versao,
-    pendentes: casos.length - Object.keys(resultados).length,
+    pendentes: casos.filter((c) => !resultados[c.id] || (refazerErros && resultados[c.id].situacao === 'erro_tecnico')).length,
     cotaEsgotada,
     relatorio,
     arquivoRelatorio: path.join(pasta, 'relatorio.md'),

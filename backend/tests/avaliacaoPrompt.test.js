@@ -102,6 +102,13 @@ test('erro técnico fica registrado e só é refeito quando pedido', async () =>
   assert.equal(refazendo.chamadas, 1);
 });
 
+test('ao refazer erros, os que a cota impediu continuam pendentes', async () => {
+  await executar(clienteCom([new Error('timeout'), new Error('timeout'), respostaFora]));
+
+  const r = await executar(clienteCom([erroCota('GenerateRequestsPerDayPerProjectPerModel-FreeTier')]), { refazerErros: true });
+  assert.equal(r.pendentes, 2);
+});
+
 test('resposta fora do formato conta como falha do prompt', async () => {
   const r = await executar(clienteCom([{ bloqueioSeguranca: false, dados: { veredito: 'talvez' } }, respostaValida, respostaFora]));
   assert.match(r.relatorio, /Resposta fora do formato \| 1/);
