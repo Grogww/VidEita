@@ -42,6 +42,7 @@ Opções:
 |---|---|
 | `--relatorio` | Só gera o relatório com o que já foi analisado, sem chamar a API |
 | `--refazer-erros` | Analisa de novo os casos que tiveram erro técnico (timeout, rede, servidor) |
+| `--erros-da-versao <versão>` | Roda a versão atual só nos casos com erro técnico na versão indicada |
 
 Respostas fora do formato não são refeitas, porque contam como falha do prompt.
 

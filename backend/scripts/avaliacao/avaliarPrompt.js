@@ -123,11 +123,25 @@ async function main() {
   }
   if (!somenteRelatorio) console.log(`Modelo ${client.modelo} · chave terminada em ...${client.apiKey.slice(-4)}`);
 
+  const dirResultados = path.join(RAIZ, 'dados', 'resultados');
+  const manifesto = await lerJson(path.join(RAIZ, 'manifesto.json'));
+
+  // Roda só os casos que tiveram erro técnico numa versão anterior.
+  const versaoErros = args[args.indexOf('--erros-da-versao') + 1];
+  if (args.includes('--erros-da-versao')) {
+    const pasta = path.join(dirResultados, versaoErros);
+    const arquivos = (await fs.readdir(pasta)).filter((f) => f.endsWith('.json'));
+    const registros = await Promise.all(arquivos.map((f) => lerJson(path.join(pasta, f))));
+    const ids = new Set(registros.filter((r) => r.situacao === 'erro_tecnico').map((r) => r.id));
+    manifesto.imagens = manifesto.imagens.filter((c) => ids.has(c.id));
+    manifesto.derivadas = manifesto.derivadas.filter((c) => ids.has(c.id));
+  }
+
   const r = await avaliar({
     client,
-    manifesto: await lerJson(path.join(RAIZ, 'manifesto.json')),
+    manifesto,
     dirImagens: path.join(RAIZ, 'dados', 'imagens'),
-    dirResultados: path.join(RAIZ, 'dados', 'resultados'),
+    dirResultados,
     pausaMs: Number(process.env.AVALIACAO_PAUSA_MS || 13000),
     refazerErros: args.includes('--refazer-erros'),
     somenteRelatorio,
